@@ -48,15 +48,25 @@ for layer in model.layers[20:]:
 # In[5]:
 
 
-train_datagen = ImageDataGenerator(preprocessing_function=preprocess_input)  # included in our dependencies
+train_datagen = ImageDataGenerator(preprocessing_function=preprocess_input, validation_split=0.9)  # included in our dependencies
 
-train_generator = train_datagen.flow_from_directory('data/organized_flowers_photos/',
+train_generator = train_datagen.flow_from_directory('data/organized_flowers_photos/train/',
                                                     # this is where you specify the path to the main data folder
                                                     target_size=(224, 224),
                                                     color_mode='rgb',
                                                     batch_size=32,
                                                     class_mode='categorical',
-                                                    shuffle=True)
+                                                    shuffle=True,
+                                                    subset='training')
+
+validation_generator = train_datagen.flow_from_directory('data/organized_flowers_photos/train/',
+                                                    # this is where you specify the path to the main data folder
+                                                    target_size=(224, 224),
+                                                    color_mode='rgb',
+                                                    batch_size=32,
+                                                    class_mode='categorical',
+                                                    shuffle=True,
+                                                    subset='validation')
 
 # In[33]:
 
@@ -67,10 +77,35 @@ model.compile(optimizer='Adam', loss='categorical_crossentropy', metrics=['accur
 # evaluation metric will be accuracy
 
 step_size_train = train_generator.n // train_generator.batch_size
+step_size_validation = validation_generator.n // validation_generator.batch_size
 
 start_time = time.time()
-model.fit_generator(generator=train_generator,
-                    steps_per_epoch=step_size_train,
-                    epochs=5)
+#model.fit_generator(generator=train_generator,
+#                    steps_per_epoch=step_size_train,
+#                    epochs=2)
+model.fit_generator(
+    train_generator,
+    steps_per_epoch=step_size_train,
+    validation_data=validation_generator,
+    validation_steps=step_size_validation,
+    epochs=1)
 end_time = time.time()
 print("total train time =", round(end_time - start_time, 2), 'seconds')
+
+test_datagen = ImageDataGenerator(preprocessing_function=preprocess_input)  # included in our dependencies
+test_generator = test_datagen.flow_from_directory('data/organized_flowers_photos/test/',
+                                                    # this is where you specify the path to the main data folder
+                                                    target_size=(224, 224),
+                                                    color_mode='rgb',
+                                                    batch_size=32,
+                                                    class_mode='categorical',
+                                                    shuffle=True)
+
+probabilities = model.predict_generator(test_generator)
+
+from sklearn.metrics import accuracy_score
+
+y_true = np.array(test_generator.labels)
+y_pred = [np.argmax(x) for x in probabilities]
+
+print("test accuracy =", accuracy_score(y_true, y_pred))
